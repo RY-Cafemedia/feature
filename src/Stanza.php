@@ -19,6 +19,9 @@ class Stanza
 
     public function __construct(array $stanza)
     {
+        // #15447 replace default variants with scheduled variants if scheduled is valid
+        $stanza = $this->getScheduledVariant($stanza);
+
         // Pull stuff from the config stanza.
         $this->description = $this->parseDescription($stanza);
         $this->enabled = $this->parseEnabled($stanza);
@@ -34,11 +37,42 @@ class Stanza
         $this->end = $this->parseEnd($stanza);
     }
 
+
     public function __get($name)
     {
         if (isset($this->$name)) return $this->$name;
         throw new \Exception("$name is not a property of the Stanza class");
     }
+
+
+    /*
+     *  Get scheduled variants if exists and active
+     *  @param  : feature config array
+     *  @return : schedued variants if scheduling is active, otherwise default variants
+     */
+    private function getScheduledVariant($stanza){
+
+        // check if scheduled config obj exists
+        if(isset($stanza['scheduled']) ){
+            $time = time();
+            $scheduled_config = $stanza['scheduled'];
+            $start_time       = $this->parseStart($scheduled_config);
+            $end_time         = $this->parseEnd($scheduled_config);
+
+            // override scheduled variants if scheduling is active
+            if( ( !empty($start_time) && $start_time <= $time )
+                && ( empty($end_time) || ( !empty($end_time) && $end_time >= $time ) ) ){
+
+                $stanza = $scheduled_config;
+
+            }
+
+        }
+
+        return $stanza;
+
+    }
+
 
     ////////////////////////////////////////////////////////////////////////
     // Configuration parsing
@@ -134,7 +168,7 @@ class Stanza
 
     private function parsePublicURLOverride(array $stanza)
     {
-        if (!isset($stanza['public_url_override'])) return false;
+        if (!isset($stanza['public_url_override'])) return true; //set true by default
         return $stanza['public_url_override'];
     }
 
